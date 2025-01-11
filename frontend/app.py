@@ -28,16 +28,18 @@ st.markdown(
 
 
 
-API_BASE_URL = "http://localhost:8000/prediction"
+API_BASE_URL = "http://localhost:8080/prediction"
 
-def upload_image(image_file):
+def upload_image(image_file, model_type):
     files = {'file' : image_file}
-    response = requests.post(f'{API_BASE_URL}/uploadimage', files=files)
+    model = {"model_type": model_type}
+    response = requests.post(f'{API_BASE_URL}/uploadimage', files=files, params=model)
     return response.json()["image_id"]
 
-def upload_video(video_file):
+def upload_video(video_file, model_type):
     files = {'file': video_file}
-    response = requests.post(f'{API_BASE_URL}/uploadvideo', files=files)
+    model = {"model_type": model_type}
+    response = requests.post(f'{API_BASE_URL}/uploadvideo', files=files, params=model) 
     return response.json()["video_id"]
 
 def get_status_image(image_id):
@@ -75,6 +77,7 @@ def delete_video(video_id):
 st.sidebar.title("Control Panel")
 st.sidebar.subheader("Upload your file here")
 upload_type = st.sidebar.radio("Choose upload type", ["Image", "Video"])
+model_type = st.sidebar.radio("Choose model" , ["sesame", "pepper"])
 
 if upload_type == "Image":
     image_file = st.sidebar.file_uploader("Upload file", type=["jpg", "jpeg", "png"])
@@ -82,9 +85,10 @@ if upload_type == "Image":
         st.sidebar.write("Press the button to upload the image:")
         if st.sidebar.button("Upload image"):
             try:
-                image_id = upload_image(image_file)
+                image_id = upload_image(image_file, model_type)
                 st.session_state["id"] = image_id
                 st.session_state["is_image"] = True
+                st.session_state["model"] = model_type
                 st.sidebar.success("Image uploaded successfully")
             except Exception as e:
                 st.error(f"An error occurred: {e}")
@@ -95,9 +99,10 @@ elif upload_type == "Video":
         st.sidebar.write("Press the button to upload the video:")
         if st.sidebar.button("Upload video"):
             try:
-                video_id = upload_video(video_file)
+                video_id = upload_video(video_file, model_type)
                 st.session_state["id"] = video_id
                 st.session_state["is_image"] = False
+                st.session_state["model"] = model_type
                 st.sidebar.success("Video uploaded successfully")
             except Exception as e:
                 st.error(f"An error occurred: {e}")
@@ -161,11 +166,7 @@ if "id"  in st.session_state:
                 
                 video_bytes = io.BytesIO(result_video)
                 video_bytes.seek(0)  
-                # video_path = r"C:\Users\Paco\Desktop\MASTER BIG DATA\5. TFM\proyecto\datasets\weed_crop_detection\video\video_crop.mp4"
-                # video_file = open(video_path, "rb")
-                # video_bytes = video_file.read()
-
-
+    
                 st.video(result_video, format="video/mp4")
 
 

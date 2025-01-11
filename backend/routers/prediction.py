@@ -14,6 +14,7 @@ from threading import Thread
 import shutil as shuntil
 import cv2
 import tempfile
+import subprocess
 
 
 router = APIRouter(
@@ -93,6 +94,7 @@ async def upload_image(file: UploadFile = File(...), model_type: str = "sesame")
         image_id = str(uuid.uuid4())
         image_data = ImageData(image_id=image_id, status="In Progress")
         image_data.save()
+        print(model_type)
         Thread(target=predict_image, args=(image, image_data, model_type)).start()
         
         return {"image_id": image_id}
@@ -172,43 +174,53 @@ class VideoData(BaseModel):
             return cls(**data)
 
 
-
 def predict_video(video_path, video_data: VideoData, model_type: str):
     try:
         model = load_model(model_type)
-        video_captures = cv2.VideoCapture(video_path)
 
-        if not video_captures.isOpened():
-             return JSONResponse(status_code=400, content={"message": "Could not open video file."})
-        
-        #Get video properties for output video
-        frame_width = int(video_captures.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(video_captures.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(video_captures.get(cv2.CAP_PROP_FPS))
-
-        # Prepare output video writer
-        os.makedirs(OUTPUT_PATH_VIDEOS, exist_ok=True)
-        video_path = os.path.join(OUTPUT_PATH_VIDEOS, f"{video_data.video_id}.mp4")
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        video_writer = cv2.VideoWriter(video_path, fourcc, fps, (frame_width, frame_height))
-
-        while video_captures.isOpened():
-            ret, frame = video_captures.read()
-            if not ret:
-                break
-
-            results = model.predict(source=frame, save=False, show=False, verbose=False)
-            annotated_frame = results[0].plot()
-            video_writer.write(annotated_frame)
-
-        video_captures.release()
-        video_writer.release()            
-        cv2.destroyAllWindows()  
-
-        video_data.video_path = video_path
-        video_data.status = "Completed"
-        video_data.save_video()
+        if not os.path.exists(video_path):
+            raise ValueError("Video file not found")
        
+
+        results = model.predict(
+            source=video_path,
+            save=False,
+            save_txt=False
+        )
+
+        cap = cv2.VideoCapture(video_path)
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        os.makedirs(OUTPUT_PATH_VIDEOS, exist_ok=True)
+        video_path_original = os.path.join(OUTPUT_PATH_VIDEOS, f"{video_data.video_id}_original.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(video_path_original, fourcc, fps, (width, height))
+
+        for result in results:
+            frame = result.plot()
+            out.write(frame)
+        
+        out.release()
+
+        # Re-codificación con FFmpeg
+        fixed_output_path = os.path.join(OUTPUT_PATH_VIDEOS, f"{video_data.video_id}.mp4")
+        ffmpeg_command = [
+            "ffmpeg", "-i", video_path_original, "-vcodec", "libx264", "-acodec", "aac", fixed_output_path
+        ]
+
+        try:
+            # Ejecutar el comando FFmpeg
+            subprocess.run(ffmpeg_command, check=True)
+            print(f"Video re-codificado guardado en: {fixed_output_path}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error al ejecutar FFmpeg: {e}")
+
+        video_data.video_path = fixed_output_path
+        video_data.status = "Completed"
+        video_data.save_video()        
 
     except Exception as e:
         video_data.status = "Failed"
@@ -228,11 +240,8 @@ async def upload_video(file: UploadFile = File(...), model_type: str = "sesame")
         video_id = str(uuid.uuid4())
         video_data = VideoData(video_id=video_id, status="In Progress")
         video_data.save_video()
-        thread1 = Thread(target=predict_video, args=(video_path, video_data, model_type))
-        thread1.start()
-        thread1.join() 
-
-        
+        Thread(target=predict_video, args=(video_path, video_data, model_type)).start()
+       
         return {"video_id": video_id}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

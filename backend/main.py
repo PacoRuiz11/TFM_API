@@ -36,7 +36,7 @@ async def read_root():
 
 
 def launch():
-    uvicorn.run("main:app", reload=True)    
+    uvicorn.run("main:app", reload=True, port=8080)    
 
 if __name__ == "__main__":
     launch()
