@@ -31,7 +31,7 @@ app.include_router(prediction.router)
 
 @app.get("/")
 async def read_root():
-    return {"Hello": "World"}
+    return {"APP_YOLO": "WEED AND CROP DETECTION"}
 
 
 

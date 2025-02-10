@@ -1,5 +1,9 @@
 from fastapi import APIRouter, HTTPException, File, UploadFile
+from fastapi.websockets import WebSocket
+import base64
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.websockets import WebSocketState
+import torch
 import uvicorn
 from ultralytics import YOLO
 from PIL import Image
@@ -52,6 +56,8 @@ class ImageData(BaseModel):
 
 
 def load_model(model_type: str):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     if model_type == "sesame":
         model_path = MODEL_PATH_SESAME
     elif model_type == "pepper":
@@ -59,6 +65,7 @@ def load_model(model_type: str):
     else:
         raise ValueError("Invalid model type")
     model = YOLO(model_path)
+    model = model.to(device)
     return model
 
 
@@ -297,6 +304,33 @@ async def delete_video(video_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@router.websocket("/ws/predict_realtime")
+async def predict_realtime(websocket: WebSocket, model_type: str = "sesame"):
+    await websocket.accept()
+    model = load_model(model_type)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            image_bytes = base64.b64decode(data)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            results = model(frame)
+
+            for result in results:
+                frame = result.plot()
+
+            _, buffer = cv2.imencode('.jpg', frame)
+            encoded_frame = base64.b64encode(buffer).decode('utf-8')
+
+            await websocket.send_text(encoded_frame)
+    
+    except WebSocketState as e:
+        print(f"WebSocket Error: {e}")
+        await websocket.close()
 
 
 
