@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import threading
 import streamlit as st
 import requests
 import time 
@@ -159,7 +158,7 @@ elif upload_type == "Real-time Video":
 
 
 # Main page
-st.title("Crop detection App")
+st.title("Crop and Weed     detection App")
 
 if "id"  in st.session_state:
     pred_id = st.session_state["id"]
@@ -188,7 +187,7 @@ if "id"  in st.session_state:
                 break
 
     if status == "Completed":
-        if is_image:
+        if is_image:    
             st.write("Result of the image prediction:")
             try:
                 result_image = get_result_image(pred_id)

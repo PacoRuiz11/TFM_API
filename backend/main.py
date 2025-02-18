@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
         print(f"Error deleting output directory: {str(e)}")
 
 
-app = FastAPI(title="FastAPI with YOLOv8", lifespan=lifespan)
+app = FastAPI(title="Weed and Crop Detection API", lifespan=lifespan)
 
 #routers
 app.include_router(prediction.router)
@@ -35,8 +35,10 @@ async def read_root():
 
 
 
+
+# Launch the app
 def launch():
-    uvicorn.run("main:app", reload=True, port=8080)    
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True) 
 
 if __name__ == "__main__":
     launch()

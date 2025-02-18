@@ -1,2 +1,6 @@
 streamlit
 requests
+opencv-python
+pillow
+numpy
+websockets
